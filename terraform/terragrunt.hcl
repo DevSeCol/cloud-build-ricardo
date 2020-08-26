@@ -12,7 +12,7 @@ remote_state {
   config = {
     project  = local.project_id
     location = local.region
-    bucket   = "${local.project_id}-terraform-state"
+    bucket   = "${local.project_id}-terraform-state-ricardo"
     prefix   = "${path_relative_to_include()}/terraform.tfstate"
 
     enable_bucket_policy_only = true
@@ -90,7 +90,7 @@ locals {
   region     = "australia-southeast1"
   zone       = "australia-southeast1-a"
   domain     = "devsecol.site"
-  email      = "chris.tippett@servian.com"
+  email      = "author@servian.com"
   image      = "7apps-demo"
 
   root_dir = get_parent_terragrunt_dir()
@@ -108,9 +108,9 @@ inputs = {
   email      = local.email
   image_name = "gcr.io/${local.project_id}/${local.image}"
 
-  github_owner  = "servian"
-  github_repo   = "7apps-google-cloud"
-  github_branch = "demo"
+  github_owner  = "devsecol"
+  github_repo   = "cloud-build-ricardo"
+  github_branch = "master"
 
 
   services = {
