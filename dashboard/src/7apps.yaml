@@ -1,0 +1,25 @@
+apps:
+  - id: localhost
+    title: "Localhost"
+    url: http://localhost:8080
+  - id: compute-engine
+    title: "Compute Engine"
+    url: https://compute.devsecol.site
+  - id: kubernetes
+    title: "Kubernetes"
+    url: https://gke.devsecol.site
+  - id: function
+    title: "Cloud Function"
+    url: https://function.devsecol.site
+  - id: run
+    title: "Cloud Run"
+    url: https://run.devsecol.site
+  - id: run-anthos
+    title: "Cloud Run:Anthos"
+    url: https://run-anthos.devsecol.site
+  - id: standard
+    title: "App Engine: Standard"
+    url: https://standard.devsecol.site
+  - id: flex
+    title: "App Engine: Flexible"
+    url: https://flex.devsecol.site

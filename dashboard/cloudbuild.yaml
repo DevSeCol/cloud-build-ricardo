@@ -1,0 +1,47 @@
+steps:
+  - id: docker-pull
+    name: gcr.io/cloud-builders/docker
+    entrypoint: "bash"
+    args: ["-c", "docker pull -q ${_IMAGE}:latest || exit 0"]
+
+  - id: docker-build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --quiet
+      - --cache-from=${_IMAGE}:latest
+      - --tag=${_IMAGE}:$SHORT_SHA
+      - --tag=${_IMAGE}:latest
+      - ./
+
+  - id: docker-push
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_IMAGE}:$SHORT_SHA"]
+
+  - id: update-config
+    name: busybox
+    entrypoint: sh
+    args:
+      - "-c"
+      - |
+        sed -i -E '/image: '$${IMAGE//\//\\\/}'/s#(.*):.*#\1:${SHORT_SHA}#' app.yaml
+    env:
+      - IMAGE=${_IMAGE}
+
+  - id: kubectl-apply
+    name: gcr.io/cloud-builders/kubectl
+    args: ["apply", "-f", "app.yaml"]
+
+images:
+  - ${_IMAGE}:latest
+  - ${_IMAGE}:$SHORT_SHA
+options:
+  substitution_option: ALLOW_LOOSE
+  env:
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    - CLOUDSDK_COMPUTE_ZONE=australia-southeast1-a
+    - CLOUDSDK_CONTAINER_CLUSTER=gke-cluster
+substitutions:
+  _IMAGE: gcr.io/devsecol/7apps-dashboard
+tags: ["dashboard"]
+timeout: 3600s

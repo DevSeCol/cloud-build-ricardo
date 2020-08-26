@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+        - image: gcr.io/devsecol/7apps-dashboard:latest
+          name: dashboard
+          env:
+            - name: GITHUB_REPO
+              value: 7apps-google-cloud
+            - name: GITHUB_BRANCH
+              value: demo
+            - name: ENABLE_STACKDRIVER_LOGGING
+              value: "1"
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          imagePullPolicy: Always
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-service
+  namespace: default
+  labels:
+    app: dashboard
+spec:
+  ports:
+    - name: dashboard-port
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: dashboard
+  type: ClusterIP
+
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: dashboard-https
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`devsecol.site`)
+      services:
+        - name: dashboard-service
+          port: 80
+  tls:
+    certResolver: le

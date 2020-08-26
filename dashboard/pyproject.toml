@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "7apps-dashboard"
+version = "0.1.0"
+description = "Landing page and app dashboard for the 7Apps demo."
+authors = ["Chris Tippett <chris.tippett@hey.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+fastapi = "^0.60.1"
+google-auth = "^1.19.2"
+jinja2 = "^2.11.2"
+uvicorn = "^0.11.6"
+aiohttp = "^3.6.2"
+PyYAML = "^5.3.1"
+pyfiglet = "^0.8.post1"
+colour = "^0.1.5"
+google-cloud-secret-manager = "^1.0.0"
+google-cloud-logging = "^1.15.1"
+google-cloud-error-reporting = "^0.34.0"
+google-cloud-storage = "^1.30.0"
+aiofiles = "^0.5.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.4.3"
+black = "^19.10b0"
+pygments = "^2.6.1"
+devtools = "^0.6"
+
+[tool.isort]
+profile = "black"
+src_paths = ["src"]
+known_local_folder = ["src"]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
