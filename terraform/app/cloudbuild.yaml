@@ -1,0 +1,214 @@
+steps:
+  # 📜 Export Python dependencies as `requirements.txt` ---------------------- #
+
+  - id: python-setup
+    name: python:3.8-slim
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        pip install -q poetry && \
+        poetry export --without-hashes -f requirements.txt > src/requirements.txt
+    dir: "app"
+    waitFor: ["-"]
+
+  # 📦 Prepare Docker image -------------------------------------------------- #
+
+  - id: docker-pull
+    name: gcr.io/cloud-builders/docker
+    entrypoint: "bash"
+    args:
+      [
+        "-c",
+        "docker --log-level=error pull --quiet gcr.io/$PROJECT_ID/${_IMAGE_NAME}:latest || exit 0",
+      ]
+    waitFor: ["-"]
+
+  - id: docker-build
+    name: gcr.io/cloud-builders/docker
+    args:
+      [
+        "--log-level=error",
+        "build",
+        "--quiet",
+        "--build-arg=VERSION=${_VERSION}",
+        "--build-arg=GRADIENT=${_GRADIENT}",
+        "--build-arg=FONT=${_FONT}",
+        "--build-arg=ASCII_FONT=${_ASCII_FONT}",
+        "--cache-from=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:latest",
+        "--tag=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}",
+        "--tag=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:latest",
+        ".",
+      ]
+    dir: "app"
+    waitFor: ["docker-pull", "python-setup"]
+
+  - id: docker-push
+    name: gcr.io/cloud-builders/docker
+    args: ["--log-level=error", "push", "gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}"]
+    waitFor: ["docker-build"]
+
+  # ========================================================================== #
+  # 🕹️ CLOUD FUNCTIONS
+  # ========================================================================== #
+
+  - id: function
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    entrypoint: gcloud
+    args:
+      [
+        "functions",
+        "deploy",
+        "function",
+        "--trigger-http",
+        "--runtime=python38",
+        "--entry-point=main",
+        "--set-env-vars=VERSION=${_VERSION},GRADIENT=${_GRADIENT},FONT=${_FONT},ASCII_FONT=${_ASCII_FONT}",
+        "--source=.",
+      ]
+    dir: "app/src"
+    waitFor: ["python-setup"]
+
+  # ========================================================================== #
+  # 🥔 APP ENGINE (STANDARD)
+  # ========================================================================== #
+
+  - id: app-engine-std
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        cp ../app.standard.yaml app.yaml;
+        cat <<EOT >> app.yaml
+
+        env_variables:
+          GRADIENT: "${_GRADIENT}"
+          FONT: "${_FONT}"
+          ASCII_FONT: "${_ASCII_FONT}"
+          VERSION: "${_VERSION}"
+
+        EOT
+        gcloud app deploy --version=demo
+    dir: "app/src"
+    waitFor: ["python-setup"]
+
+  # ========================================================================== #
+  # 🐌 APP ENGINE (FLEXIBLE)
+  # ========================================================================== #
+
+  - id: app-engine-flex
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    entrypoint: gcloud
+    args:
+      [
+        "app",
+        "deploy",
+        "app.flex.yaml",
+        "--version=demo",
+        "--image-url=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}",
+      ]
+    dir: "app"
+    waitFor: ["docker-push"]
+
+  # ========================================================================== #
+  # 🏃‍♀️ CLOUD RUN
+  # ========================================================================== #
+
+  - id: cloud-run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    entrypoint: gcloud
+    args:
+      [
+        "run",
+        "deploy",
+        "run",
+        "--image=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}",
+        "--platform=managed",
+      ]
+    waitFor: ["docker-push"]
+
+  # ========================================================================== #
+  # 🏃‍♂️ CLOUD RUN (ANTHOS)
+  # ========================================================================== #
+
+#  - id: cloud-run-gke
+#    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+#    entrypoint: gcloud
+#    args:
+#      [
+#        "run",
+#        "deploy",
+#        "run-anthos",
+#        "--image=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}",
+#        "--platform=gke",
+#        "--namespace=default",
+#      ]
+#    waitFor: ["docker-push"]
+
+  # ========================================================================== #
+  # 🤖 GOOGLE COMPUTE ENGINE
+  # ========================================================================== #
+
+  - id: compute-engine
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        gcloud compute start-iap-tunnel compute 9000 \
+          --local-host-port=localhost:9000 &
+
+        # give tunnel time to connect
+        sleep 15;
+
+        curl -X PATCH https://localhost:9000/hooks/update-env \
+        --silent --show-error --fail --insecure \
+        --header 'Content-Type: application/json' \
+        --header "Host: compute.devsecol.site" \
+        --data '{ "key": "IMAGE_TAG", "value": "${_VERSION}" }'
+    waitFor: ["docker-push"]
+
+  # ========================================================================== #
+  # 🚂 GOOGLE KUBERENTES ENGINE (GKE)
+  # ========================================================================== #
+
+  - id: kubernetes
+    name: gcr.io/cloud-builders/kubectl
+    args:
+      [
+        "set",
+        "image",
+        "deployment/gke-app",
+        "gke-app=gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}",
+      ]
+    dir: "app"
+    waitFor: ["docker-push"]
+
+# ⚙️ Configuration ----------------------------------------------------------- #
+
+images:
+  - gcr.io/$PROJECT_ID/${_IMAGE_NAME}:latest
+  - gcr.io/$PROJECT_ID/${_IMAGE_NAME}:${_VERSION}
+options:
+  logStreamingOption: STREAM_ON
+  substitution_option: ALLOW_LOOSE
+  dynamic_substitutions: true
+  env:
+    - CLOUDSDK_COMPUTE_ZONE=australia-southeast1-a
+    - CLOUDSDK_CONTAINER_CLUSTER=gke-cluster
+    - CLOUDSDK_FUNCTIONS_REGION=us-central1
+    - CLOUDSDK_RUN_REGION=us-central1
+    - CLOUDSDK_RUN_CLUSTER_LOCATION=australia-southeast1-a
+    - CLOUDSDK_RUN_CLUSTER=gke-cluster
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    # - CLOUDSDK_APP_PROMOTE_BY_DEFAULT=1
+    # - CLOUDSDK_APP_STOP_PREVIOUS_VERSION=1
+substitutions:
+  _IMAGE_NAME: 7apps-demo
+  _GRADIENT: ""
+  _FONT: ""
+  _ASCII_FONT: ""
+  _VERSION: "${SHORT_SHA}"
+tags: ["app"]
+timeout: 3600s

@@ -4,7 +4,7 @@
 resource "google_dns_managed_zone" "default" {
   project     = var.project_id
   name        = "zone-${replace(var.domain, ".", "-")}"
-  description = "Public DNS zone for 7apps.servian.fun"
+  description = "Public DNS zone"
   dns_name    = "${var.domain}."
 }
 

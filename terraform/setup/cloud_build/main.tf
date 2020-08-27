@@ -2,16 +2,16 @@
 # Build Docker container so the image is available to other services when
 #  they're first created.
 
-resource "null_resource" "initial_container_build" {
-  provisioner "local-exec" {
-    working_dir = var.app_dir
-    command     = <<EOT
-    gcloud builds submit \
-      --config cloudbuild.container.yaml \
-      --substitutions="SHORT_SHA=latest,_IMAGE_NAME=${var.image_name}"
-EOT
-  }
-}
+# resource "null_resource" "initial_container_build" {
+#   provisioner "local-exec" {
+#     working_dir = var.app_dir
+#     command     = <<EOT
+#     gcloud builds submit \
+#       --config cloudbuild.container.yaml \
+#       --substitutions="SHORT_SHA=latest,_IMAGE_NAME=${var.image_name}"
+# EOT
+#   }
+# }
 
 resource "google_cloudbuild_trigger" "deploy" {
   provider = google-beta

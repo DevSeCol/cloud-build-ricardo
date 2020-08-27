@@ -10,7 +10,7 @@ resource "google_container_cluster" "gke" {
   provider = google-beta
 
   name               = "gke-cluster"
-  min_master_version = "1.16.10-gke.8"
+  min_master_version = "1.16.13-gke.1"
   location           = var.zone
   project            = var.project_id
   network            = var.network_name
